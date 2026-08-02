@@ -6,6 +6,10 @@ import DashboardCards from "./components/dashboardCards";
 import GrowthChart from "./components/growthChart";
 import AuthGuard from "./components/authGuard";
 import LogoutButton from "./components/logoutButton";
+import SaveSimulationButton from "./components/saveSimulationButton";
+import Link from "next/link";
+import UserProfile from "./components/userProfile";
+import PdfReport from "./components/pdfReport";
 
 type Currency = "USD" | "USC";
 
@@ -88,9 +92,18 @@ return {
 
       <div className="relative mx-auto flex min-h-screen max-w-6xl flex-col px-5 py-8 sm:px-8">
         <Header />
-        <div className="mb-6 flex justify-end">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+  <Link
+    href="/history"
+    className="rounded-xl border border-blue-400/30 bg-blue-500/15 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500/25"
+  >
+    Ver historial
+  </Link>
+
   <LogoutButton />
 </div>
+
+<UserProfile />
 
 <DashboardCards
   capital={capital}
@@ -263,6 +276,25 @@ return {
                 estimadas. No representa una promesa ni una garantía de
                 rentabilidad. Los resultados reales pueden variar.
               </div>
+              <SaveSimulationButton
+  capital={capital}
+  currency={currency}
+  percentage={activePercentage}
+  lot={results.lot}
+  estimatedProfit={results.estimatedProfit}
+  finalCapital={results.finalCapital}
+  projections={results.projections}
+/>
+
+<PdfReport
+  capital={capital}
+  currency={currency}
+  percentage={activePercentage}
+  lot={results.lot}
+  estimatedProfit={results.estimatedProfit}
+  finalCapital={results.finalCapital}
+  projections={results.projections}
+/>
               <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
   <div className="border-b border-white/10 px-5 py-4">
     <p className="text-xs font-semibold uppercase tracking-[0.25em] text-blue-400">
