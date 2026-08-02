@@ -1,9 +1,18 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import {
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signOut,
+} from "firebase/auth";
+import {
+  doc,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
 import { useRouter } from "next/navigation";
-import { auth } from "../../lib/firebase";
+import { auth, db } from "../../lib/firebase";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -12,16 +21,78 @@ export default function LoginForm() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+
+  async function handlePasswordReset() {
+    setError("");
+    setMessage("");
+
+    const cleanEmail = email.trim();
+
+    if (!cleanEmail) {
+      setError("Escribe primero tu correo electrónico.");
+      return;
+    }
+
+    setResetLoading(true);
+
+    try {
+      auth.languageCode = "es";
+
+      await sendPasswordResetEmail(auth, cleanEmail);
+
+      setMessage(
+        "Te enviamos un correo para restablecer tu contraseña. Revisa también la carpeta de spam."
+      );
+    } catch {
+      setError(
+        "No se pudo enviar el correo de recuperación. Verifica la dirección escrita."
+      );
+    } finally {
+      setResetLoading(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setMessage("");
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email.trim(), password);
-      router.push("/");
+      const credential = await signInWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password
+      );
+
+      const user = credential.user;
+
+      if (!user.emailVerified) {
+        await signOut(auth);
+
+        setError(
+          "Debes verificar tu correo electrónico antes de ingresar. Revisa también la carpeta de spam."
+        );
+
+        return;
+      }
+
+      await setDoc(
+        doc(db, "users", user.uid),
+        {
+          uid: user.uid,
+          email: user.email?.toLowerCase() ?? email.trim().toLowerCase(),
+          emailVerified: true,
+          status: "active",
+          lastLoginAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      router.replace("/");
     } catch {
       setError("Correo o contraseña incorrectos.");
     } finally {
@@ -62,7 +133,7 @@ export default function LoginForm() {
         />
       </div>
 
-      <div className="mb-6">
+      <div className="mb-3">
         <label
           htmlFor="password"
           className="mb-2 block text-sm text-slate-300"
@@ -91,6 +162,26 @@ export default function LoginForm() {
           </button>
         </div>
       </div>
+
+      <button
+        type="button"
+        onClick={handlePasswordReset}
+        disabled={resetLoading}
+        className="mb-5 text-sm font-semibold text-blue-400 hover:text-blue-300 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {resetLoading
+          ? "Enviando correo..."
+          : "¿Olvidaste tu contraseña?"}
+      </button>
+
+      {message && (
+        <div
+          role="status"
+          className="mb-5 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300"
+        >
+          {message}
+        </div>
+      )}
 
       {error && (
         <div

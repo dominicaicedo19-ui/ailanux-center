@@ -5,6 +5,7 @@ import Header from "./components/header";
 import DashboardCards from "./components/dashboardCards";
 import GrowthChart from "./components/growthChart";
 import AuthGuard from "./components/authGuard";
+import LogoutButton from "./components/logoutButton";
 
 type Currency = "USD" | "USC";
 
@@ -87,6 +88,10 @@ return {
 
       <div className="relative mx-auto flex min-h-screen max-w-6xl flex-col px-5 py-8 sm:px-8">
         <Header />
+        <div className="mb-6 flex justify-end">
+  <LogoutButton />
+</div>
+
 <DashboardCards
   capital={capital}
   currency={currency}
