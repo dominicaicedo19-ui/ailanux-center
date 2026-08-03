@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import {
   sendEmailVerification,
   sendPasswordResetEmail,
@@ -9,6 +9,7 @@ import {
 } from "firebase/auth";
 import {
   doc,
+  getDoc,
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
@@ -25,6 +26,16 @@ export default function LoginForm() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+
+  useEffect(() => {
+    const parameters = new URLSearchParams(window.location.search);
+
+    if (parameters.get("blocked") === "true") {
+      setError(
+        "Tu cuenta está bloqueada. Comunícate con el administrador de AILANUX CENTER."
+      );
+    }
+  }, []);
 
   async function handlePasswordReset() {
     setError("");
@@ -58,6 +69,7 @@ export default function LoginForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
     setError("");
     setMessage("");
     setLoading(true);
@@ -71,23 +83,66 @@ export default function LoginForm() {
 
       const user = credential.user;
 
-     if (!user.emailVerified) {
-  auth.languageCode = "es";
+      if (!user.emailVerified) {
+        auth.languageCode = "es";
 
-  await sendEmailVerification(user);
-  await signOut(auth);
+        await sendEmailVerification(user);
+        await signOut(auth);
 
-  setError(
-    "Tu correo todavía no está verificado. Te enviamos un nuevo enlace de verificación. Revisa también la carpeta de spam."
-  );
+        setError(
+          "Tu correo todavía no está verificado. Te enviamos un nuevo enlace de verificación. Revisa también la carpeta de spam."
+        );
 
-  return;
-}
+        return;
+      }
+
+      const profileReference = doc(db, "users", user.uid);
+      const profileSnapshot = await getDoc(profileReference);
+
+      if (!profileSnapshot.exists()) {
+        await signOut(auth);
+
+        setError(
+          "No se encontró el perfil de esta cuenta. Comunícate con el administrador."
+        );
+
+        return;
+      }
+
+      const currentStatus = String(
+        profileSnapshot.data().status ?? ""
+      );
+
+      if (currentStatus === "blocked") {
+        await signOut(auth);
+
+        setError(
+          "Tu cuenta está bloqueada. Comunícate con el administrador de AILANUX CENTER."
+        );
+
+        return;
+      }
+
+      if (
+        currentStatus !== "active" &&
+        currentStatus !== "pending-verification"
+      ) {
+        await signOut(auth);
+
+        setError(
+          "Esta cuenta no tiene autorización para ingresar."
+        );
+
+        return;
+      }
+
       await setDoc(
-        doc(db, "users", user.uid),
+        profileReference,
         {
           uid: user.uid,
-          email: user.email?.toLowerCase() ?? email.trim().toLowerCase(),
+          email:
+            user.email?.toLowerCase() ??
+            email.trim().toLowerCase(),
           emailVerified: true,
           status: "active",
           lastLoginAt: serverTimestamp(),
@@ -158,7 +213,9 @@ export default function LoginForm() {
 
           <button
             type="button"
-            onClick={() => setShowPassword((current) => !current)}
+            onClick={() =>
+              setShowPassword((current) => !current)
+            }
             className="px-4 text-sm text-blue-400 hover:text-blue-300"
           >
             {showPassword ? "Ocultar" : "Mostrar"}
@@ -169,7 +226,7 @@ export default function LoginForm() {
       <button
         type="button"
         onClick={handlePasswordReset}
-        disabled={resetLoading}
+        disabled={resetLoading || loading}
         className="mb-5 text-sm font-semibold text-blue-400 hover:text-blue-300 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {resetLoading
@@ -197,7 +254,7 @@ export default function LoginForm() {
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || resetLoading}
         className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 py-3 font-bold text-black transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
       >
         {loading ? "Verificando..." : "Iniciar sesión"}
