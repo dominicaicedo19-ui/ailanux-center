@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import {
+  sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
@@ -70,16 +71,18 @@ export default function LoginForm() {
 
       const user = credential.user;
 
-      if (!user.emailVerified) {
-        await signOut(auth);
+     if (!user.emailVerified) {
+  auth.languageCode = "es";
 
-        setError(
-          "Debes verificar tu correo electrónico antes de ingresar. Revisa también la carpeta de spam."
-        );
+  await sendEmailVerification(user);
+  await signOut(auth);
 
-        return;
-      }
+  setError(
+    "Tu correo todavía no está verificado. Te enviamos un nuevo enlace de verificación. Revisa también la carpeta de spam."
+  );
 
+  return;
+}
       await setDoc(
         doc(db, "users", user.uid),
         {
