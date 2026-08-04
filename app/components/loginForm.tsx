@@ -11,7 +11,7 @@ import {
   doc,
   getDoc,
   serverTimestamp,
-  setDoc,
+  updateDoc,
 } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { auth, db } from "../../lib/firebase";
@@ -28,7 +28,9 @@ export default function LoginForm() {
   const [resetLoading, setResetLoading] = useState(false);
 
   useEffect(() => {
-    const parameters = new URLSearchParams(window.location.search);
+    const parameters = new URLSearchParams(
+      window.location.search
+    );
 
     if (parameters.get("blocked") === "true") {
       setError(
@@ -41,7 +43,7 @@ export default function LoginForm() {
     setError("");
     setMessage("");
 
-    const cleanEmail = email.trim();
+    const cleanEmail = email.trim().toLowerCase();
 
     if (!cleanEmail) {
       setError("Escribe primero tu correo electrónico.");
@@ -58,7 +60,12 @@ export default function LoginForm() {
       setMessage(
         "Te enviamos un correo para restablecer tu contraseña. Revisa también la carpeta de spam."
       );
-    } catch {
+    } catch (resetError) {
+      console.error(
+        "Error enviando recuperación:",
+        resetError
+      );
+
       setError(
         "No se pudo enviar el correo de recuperación. Verifica la dirección escrita."
       );
@@ -67,22 +74,38 @@ export default function LoginForm() {
     }
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
 
     setError("");
     setMessage("");
     setLoading(true);
 
+    let user;
+
     try {
-      const credential = await signInWithEmailAndPassword(
-        auth,
-        email.trim(),
-        password
+      const credential =
+        await signInWithEmailAndPassword(
+          auth,
+          email.trim().toLowerCase(),
+          password
+        );
+
+      user = credential.user;
+    } catch (authenticationError) {
+      console.error(
+        "Error de autenticación:",
+        authenticationError
       );
 
-      const user = credential.user;
+      setError("Correo o contraseña incorrectos.");
+      setLoading(false);
+      return;
+    }
 
+    try {
       if (!user.emailVerified) {
         auth.languageCode = "es";
 
@@ -96,8 +119,15 @@ export default function LoginForm() {
         return;
       }
 
-      const profileReference = doc(db, "users", user.uid);
-      const profileSnapshot = await getDoc(profileReference);
+      const profileReference = doc(
+        db,
+        "users",
+        user.uid
+      );
+
+      const profileSnapshot = await getDoc(
+        profileReference
+      );
 
       if (!profileSnapshot.exists()) {
         await signOut(auth);
@@ -136,23 +166,42 @@ export default function LoginForm() {
         return;
       }
 
-      await setDoc(
-        profileReference,
-        {
-          uid: user.uid,
-          email:
-            user.email?.toLowerCase() ??
-            email.trim().toLowerCase(),
-          emailVerified: true,
-          status: "active",
-          lastLoginAt: serverTimestamp(),
-        },
-        { merge: true }
+      if (currentStatus === "pending-verification") {
+  await updateDoc(profileReference, {
+    emailVerified: true,
+    status: "active",
+    lastLoginAt: serverTimestamp(),
+  });
+}
+
+const adminReference = doc(
+  db,
+  "admins",
+  user.uid
+);
+
+const adminSnapshot = await getDoc(
+  adminReference
+);
+
+      const isAdmin =
+        adminSnapshot.exists() &&
+        adminSnapshot.data().active === true;
+
+      router.replace(
+        isAdmin ? "/admin" : "/"
+      );
+    } catch (accessError) {
+      console.error(
+        "Error validando el acceso:",
+        accessError
       );
 
-      router.replace("/");
-    } catch {
-      setError("Correo o contraseña incorrectos.");
+      await signOut(auth);
+
+      setError(
+        "No se pudo validar el acceso de la cuenta. Revisa las reglas de Firestore."
+      );
     } finally {
       setLoading(false);
     }
@@ -183,7 +232,9 @@ export default function LoginForm() {
           id="email"
           type="email"
           value={email}
-          onChange={(event) => setEmail(event.target.value)}
+          onChange={(event) =>
+            setEmail(event.target.value)
+          }
           placeholder="correo@ejemplo.com"
           autoComplete="email"
           required
@@ -202,9 +253,15 @@ export default function LoginForm() {
         <div className="flex items-center rounded-xl border border-white/10 bg-black/30 focus-within:border-blue-500">
           <input
             id="password"
-            type={showPassword ? "text" : "password"}
+            type={
+              showPassword
+                ? "text"
+                : "password"
+            }
             value={password}
-            onChange={(event) => setPassword(event.target.value)}
+            onChange={(event) =>
+              setPassword(event.target.value)
+            }
             placeholder="********"
             autoComplete="current-password"
             required
@@ -214,11 +271,15 @@ export default function LoginForm() {
           <button
             type="button"
             onClick={() =>
-              setShowPassword((current) => !current)
+              setShowPassword(
+                (current) => !current
+              )
             }
             className="px-4 text-sm text-blue-400 hover:text-blue-300"
           >
-            {showPassword ? "Ocultar" : "Mostrar"}
+            {showPassword
+              ? "Ocultar"
+              : "Mostrar"}
           </button>
         </div>
       </div>
@@ -257,7 +318,9 @@ export default function LoginForm() {
         disabled={loading || resetLoading}
         className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 py-3 font-bold text-black transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {loading ? "Verificando..." : "Iniciar sesión"}
+        {loading
+          ? "Verificando..."
+          : "Iniciar sesión"}
       </button>
     </form>
   );
