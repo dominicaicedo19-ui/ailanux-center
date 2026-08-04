@@ -1,10 +1,15 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../../lib/firebase";
 
 export default function Header() {
   const [dateTime, setDateTime] = useState<Date | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     setDateTime(new Date());
@@ -14,6 +19,40 @@ export default function Header() {
     }, 1000);
 
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(
+      auth,
+      async (user) => {
+        if (!user) {
+          setIsAdmin(false);
+          return;
+        }
+
+        try {
+          const adminSnapshot = await getDoc(
+            doc(db, "admins", user.uid)
+          );
+
+          const adminData = adminSnapshot.data();
+
+          setIsAdmin(
+            adminSnapshot.exists() &&
+              adminData?.active === true
+          );
+        } catch (error) {
+          console.error(
+            "No se pudo verificar el acceso administrativo:",
+            error
+          );
+
+          setIsAdmin(false);
+        }
+      }
+    );
+
+    return () => unsubscribeAuth();
   }, []);
 
   const formattedDate = dateTime
@@ -96,12 +135,22 @@ export default function Header() {
                 <p className="font-bold text-emerald-300">
                   Sistema en línea
                 </p>
+
                 <p className="text-xs text-slate-500">
                   Calculadora disponible
                 </p>
               </div>
             </div>
           </div>
+
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-5 py-3 text-center text-sm font-bold text-amber-300 transition hover:bg-amber-500/20 sm:col-span-2"
+            >
+              Abrir panel administrativo
+            </Link>
+          )}
         </div>
       </div>
     </header>
