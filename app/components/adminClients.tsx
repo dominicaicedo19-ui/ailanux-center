@@ -22,67 +22,170 @@ type ClientData = {
 
 export default function AdminClients() {
   const [clients, setClients] = useState<ClientData[]>([]);
+  const [simulationCounts, setSimulationCounts] = useState<
+    Record<string, number>
+  >({});
+
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [simulationError, setSimulationError] = useState("");
   const [actionError, setActionError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
-  const [updatingClientId, setUpdatingClientId] = useState("");
+  const [updatingClientId, setUpdatingClientId] =
+    useState("");
 
   useEffect(() => {
     let unsubscribeClients: (() => void) | undefined;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      unsubscribeClients?.();
+    const simulationUnsubscribers = new Map<
+      string,
+      () => void
+    >();
 
-      if (!user) {
-        setClients([]);
-        setLoading(false);
-        return;
-      }
+    function clearSimulationListeners() {
+      simulationUnsubscribers.forEach((unsubscribe) => {
+        unsubscribe();
+      });
 
-      unsubscribeClients = onSnapshot(
-        collection(db, "users"),
-        (snapshot) => {
-          const loadedClients = snapshot.docs.map((document) => {
-            const data = document.data();
+      simulationUnsubscribers.clear();
+    }
 
-            return {
-              id: document.id,
-              name: String(data.name ?? "Cliente sin nombre"),
-              email: String(data.email ?? ""),
-              status: String(data.status ?? "unknown"),
-              role: String(data.role ?? "client"),
-              createdAt:
-                data.createdAt instanceof Timestamp
-                  ? data.createdAt
-                  : null,
-            };
-          });
+    const unsubscribeAuth = onAuthStateChanged(
+      auth,
+      (user) => {
+        unsubscribeClients?.();
+        clearSimulationListeners();
 
-          loadedClients.sort((first, second) => {
-            const firstDate = first.createdAt?.toMillis() ?? 0;
-            const secondDate = second.createdAt?.toMillis() ?? 0;
+        setSimulationCounts({});
+        setSimulationError("");
 
-            return secondDate - firstDate;
-          });
-
-          setClients(loadedClients);
-          setLoadError("");
+        if (!user) {
+          setClients([]);
           setLoading(false);
-        },
-        () => {
-          setLoadError(
-            "No se pudo cargar la lista de clientes. Verifica tu acceso administrativo."
-          );
-          setLoading(false);
+          return;
         }
-      );
-    });
+
+        setLoading(true);
+
+        unsubscribeClients = onSnapshot(
+          collection(db, "users"),
+          (snapshot) => {
+            const loadedClients = snapshot.docs.map(
+              (document) => {
+                const data = document.data();
+
+                return {
+                  id: document.id,
+                  name: String(
+                    data.name ?? "Cliente sin nombre"
+                  ),
+                  email: String(data.email ?? ""),
+                  status: String(
+                    data.status ?? "unknown"
+                  ),
+                  role: String(data.role ?? "client"),
+                  createdAt:
+                    data.createdAt instanceof Timestamp
+                      ? data.createdAt
+                      : null,
+                };
+              }
+            );
+
+            loadedClients.sort((first, second) => {
+              const firstDate =
+                first.createdAt?.toMillis() ?? 0;
+
+              const secondDate =
+                second.createdAt?.toMillis() ?? 0;
+
+              return secondDate - firstDate;
+            });
+
+            const currentClientIds = new Set(
+              loadedClients.map((client) => client.id)
+            );
+
+            simulationUnsubscribers.forEach(
+              (unsubscribe, clientId) => {
+                if (!currentClientIds.has(clientId)) {
+                  unsubscribe();
+                  simulationUnsubscribers.delete(clientId);
+
+                  setSimulationCounts((current) => {
+                    const updatedCounts = { ...current };
+
+                    delete updatedCounts[clientId];
+
+                    return updatedCounts;
+                  });
+                }
+              }
+            );
+
+            loadedClients.forEach((client) => {
+              if (
+                simulationUnsubscribers.has(client.id)
+              ) {
+                return;
+              }
+
+              const unsubscribeSimulations = onSnapshot(
+                collection(
+                  db,
+                  "users",
+                  client.id,
+                  "simulations"
+                ),
+                (simulationSnapshot) => {
+                  setSimulationCounts((current) => ({
+                    ...current,
+                    [client.id]: simulationSnapshot.size,
+                  }));
+                },
+                (error) => {
+                  console.error(
+                    `Error cargando simulaciones de ${client.id}:`,
+                    error
+                  );
+
+                  setSimulationError(
+                    "No se pudieron cargar algunos conteos de simulaciones. Verifica las reglas de Firestore."
+                  );
+                }
+              );
+
+              simulationUnsubscribers.set(
+                client.id,
+                unsubscribeSimulations
+              );
+            });
+
+            setClients(loadedClients);
+            setLoadError("");
+            setLoading(false);
+          },
+          (error) => {
+            console.error(
+              "Error cargando clientes:",
+              error
+            );
+
+            setLoadError(
+              "No se pudo cargar la lista de clientes. Verifica tu acceso administrativo."
+            );
+
+            setLoading(false);
+          }
+        );
+      }
+    );
 
     return () => {
       unsubscribeAuth();
       unsubscribeClients?.();
+      clearSimulationListeners();
     };
   }, []);
 
@@ -95,11 +198,29 @@ export default function AdminClients() {
 
     return clients.filter((client) => {
       return (
-        client.name.toLowerCase().includes(cleanSearch) ||
-        client.email.toLowerCase().includes(cleanSearch)
+        client.name
+          .toLowerCase()
+          .includes(cleanSearch) ||
+        client.email
+          .toLowerCase()
+          .includes(cleanSearch)
       );
     });
   }, [clients, search]);
+
+  const totalSimulations = useMemo(() => {
+    return Object.values(simulationCounts).reduce(
+      (total, count) => total + count,
+      0
+    );
+  }, [simulationCounts]);
+
+  const simulationCountsLoaded =
+    clients.length === 0 ||
+    clients.every(
+      (client) =>
+        simulationCounts[client.id] !== undefined
+    );
 
   function formatDate(value: Timestamp | null) {
     if (!value) {
@@ -140,14 +261,19 @@ export default function AdminClients() {
     return "rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-300";
   }
 
-  async function changeClientStatus(client: ClientData) {
+  async function changeClientStatus(
+    client: ClientData
+  ) {
     setActionError("");
     setActionMessage("");
 
     const currentAdmin = auth.currentUser;
 
     if (!currentAdmin) {
-      setActionError("La sesión administrativa no está disponible.");
+      setActionError(
+        "La sesión administrativa no está disponible."
+      );
+
       return;
     }
 
@@ -155,14 +281,19 @@ export default function AdminClients() {
       setActionError(
         "No puedes bloquear tu propia cuenta administrativa."
       );
+
       return;
     }
 
     const newStatus =
-      client.status === "blocked" ? "active" : "blocked";
+      client.status === "blocked"
+        ? "active"
+        : "blocked";
 
     const actionText =
-      newStatus === "blocked" ? "bloquear" : "activar";
+      newStatus === "blocked"
+        ? "bloquear"
+        : "activar";
 
     const confirmed = window.confirm(
       `¿Seguro que deseas ${actionText} la cuenta de ${client.name}?`
@@ -175,9 +306,12 @@ export default function AdminClients() {
     setUpdatingClientId(client.id);
 
     try {
-      await updateDoc(doc(db, "users", client.id), {
-        status: newStatus,
-      });
+      await updateDoc(
+        doc(db, "users", client.id),
+        {
+          status: newStatus,
+        }
+      );
 
       setActionMessage(
         newStatus === "blocked"
@@ -185,7 +319,10 @@ export default function AdminClients() {
           : `La cuenta de ${client.name} fue activada.`
       );
     } catch (error) {
-      console.error("Error actualizando cliente:", error);
+      console.error(
+        "Error actualizando cliente:",
+        error
+      );
 
       setActionError(
         "No se pudo cambiar el estado del cliente. Verifica las reglas de Firestore."
@@ -213,7 +350,7 @@ export default function AdminClients() {
 
   return (
     <section>
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">
             Clientes registrados
@@ -232,7 +369,8 @@ export default function AdminClients() {
           <p className="mt-3 text-4xl font-bold text-emerald-300">
             {
               clients.filter(
-                (client) => client.status === "active"
+                (client) =>
+                  client.status === "active"
               ).length
             }
           </p>
@@ -246,12 +384,34 @@ export default function AdminClients() {
           <p className="mt-3 text-4xl font-bold text-red-300">
             {
               clients.filter(
-                (client) => client.status === "blocked"
+                (client) =>
+                  client.status === "blocked"
               ).length
             }
           </p>
         </div>
+
+        <div className="rounded-2xl border border-blue-400/20 bg-blue-500/[0.06] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">
+            Simulaciones guardadas
+          </p>
+
+          <p className="mt-3 text-4xl font-bold text-blue-300">
+            {simulationCountsLoaded
+              ? totalSimulations
+              : "..."}
+          </p>
+        </div>
       </div>
+
+      {simulationError && (
+        <div
+          role="alert"
+          className="mb-5 rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300"
+        >
+          {simulationError}
+        </div>
+      )}
 
       {actionMessage && (
         <div
@@ -284,7 +444,9 @@ export default function AdminClients() {
           <input
             type="search"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) =>
+              setSearch(event.target.value)
+            }
             placeholder="Buscar por nombre o correo..."
             className="mt-5 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-blue-400"
           />
@@ -296,15 +458,36 @@ export default function AdminClients() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-left">
+            <table className="w-full min-w-[1120px] text-left">
               <thead className="border-b border-white/10 bg-black/20">
                 <tr className="text-xs uppercase tracking-wider text-slate-500">
-                  <th className="px-5 py-4">Cliente</th>
-                  <th className="px-5 py-4">Correo</th>
-                  <th className="px-5 py-4">Estado</th>
-                  <th className="px-5 py-4">Rol</th>
-                  <th className="px-5 py-4">Registro</th>
-                  <th className="px-5 py-4">Acción</th>
+                  <th className="px-5 py-4">
+                    Cliente
+                  </th>
+
+                  <th className="px-5 py-4">
+                    Correo
+                  </th>
+
+                  <th className="px-5 py-4">
+                    Estado
+                  </th>
+
+                  <th className="px-5 py-4">
+                    Rol
+                  </th>
+
+                  <th className="px-5 py-4 text-center">
+                    Simulaciones
+                  </th>
+
+                  <th className="px-5 py-4">
+                    Registro
+                  </th>
+
+                  <th className="px-5 py-4">
+                    Acción
+                  </th>
                 </tr>
               </thead>
 
@@ -315,6 +498,9 @@ export default function AdminClients() {
 
                   const isUpdating =
                     updatingClientId === client.id;
+
+                  const clientSimulationCount =
+                    simulationCounts[client.id];
 
                   return (
                     <tr
@@ -341,7 +527,9 @@ export default function AdminClients() {
                             client.status
                           )}
                         >
-                          {getStatusLabel(client.status)}
+                          {getStatusLabel(
+                            client.status
+                          )}
                         </span>
                       </td>
 
@@ -349,8 +537,17 @@ export default function AdminClients() {
                         {client.role}
                       </td>
 
+                      <td className="px-5 py-4 text-center">
+                        <span className="inline-flex min-w-10 justify-center rounded-lg border border-blue-400/20 bg-blue-500/10 px-3 py-2 font-bold text-blue-300">
+                          {clientSimulationCount ??
+                            "..."}
+                        </span>
+                      </td>
+
                       <td className="px-5 py-4 text-sm text-slate-500">
-                        {formatDate(client.createdAt)}
+                        {formatDate(
+                          client.createdAt
+                        )}
                       </td>
 
                       <td className="px-5 py-4">
@@ -362,18 +559,22 @@ export default function AdminClients() {
                           <button
                             type="button"
                             onClick={() =>
-                              changeClientStatus(client)
+                              changeClientStatus(
+                                client
+                              )
                             }
                             disabled={isUpdating}
                             className={
-                              client.status === "blocked"
+                              client.status ===
+                              "blocked"
                                 ? "rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                                 : "rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                             }
                           >
                             {isUpdating
                               ? "Procesando..."
-                              : client.status === "blocked"
+                              : client.status ===
+                                  "blocked"
                                 ? "Activar"
                                 : "Bloquear"}
                           </button>
