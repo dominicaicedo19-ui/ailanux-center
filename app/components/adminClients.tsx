@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import {
@@ -10,6 +11,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { auth, db } from "../../lib/firebase";
+
 
 type ClientData = {
   id: string;
@@ -486,7 +488,7 @@ export default function AdminClients() {
                   </th>
 
                   <th className="px-5 py-4">
-                    Acción
+                    Acciónes
                   </th>
                 </tr>
               </thead>
@@ -550,36 +552,41 @@ export default function AdminClients() {
                         )}
                       </td>
 
-                      <td className="px-5 py-4">
-                        {isCurrentAdmin ? (
-                          <span className="text-xs text-slate-500">
-                            Protegida
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              changeClientStatus(
-                                client
-                              )
-                            }
-                            disabled={isUpdating}
-                            className={
-                              client.status ===
-                              "blocked"
-                                ? "rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                                : "rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                            }
-                          >
-                            {isUpdating
-                              ? "Procesando..."
-                              : client.status ===
-                                  "blocked"
-                                ? "Activar"
-                                : "Bloquear"}
-                          </button>
-                        )}
-                      </td>
+                     <td className="px-5 py-4">
+  <div className="flex flex-wrap items-center gap-2">
+    <Link
+      href={`/admin/client/${client.id}`}
+      className="rounded-lg border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500/20"
+    >
+      Ver historial
+    </Link>
+
+    {isCurrentAdmin ? (
+      <span className="px-2 text-xs text-slate-500">
+        Cuenta protegida
+      </span>
+    ) : (
+      <button
+        type="button"
+        onClick={() =>
+          changeClientStatus(client)
+        }
+        disabled={isUpdating}
+        className={
+          client.status === "blocked"
+            ? "rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+            : "rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+        }
+      >
+        {isUpdating
+          ? "Procesando..."
+          : client.status === "blocked"
+            ? "Activar"
+            : "Bloquear"}
+      </button>
+    )}
+  </div>
+</td>
                     </tr>
                   );
                 })}
