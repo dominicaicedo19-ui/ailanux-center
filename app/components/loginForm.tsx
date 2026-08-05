@@ -173,11 +173,17 @@ export default function LoginForm() {
     lastLoginAt: serverTimestamp(),
   });
 } else {
-  await updateDoc(profileReference, {
-    lastLoginAt: serverTimestamp(),
-  });
+  try {
+    await updateDoc(profileReference, {
+      lastLoginAt: serverTimestamp(),
+    });
+  } catch (lastLoginError) {
+    console.warn(
+      "No se pudo actualizar el último acceso:",
+      lastLoginError
+    );
+  }
 }
-
 const adminReference = doc(
   db,
   "admins",

@@ -18,6 +18,7 @@ type ClientData = {
   email: string;
   status: string;
   role: string;
+  simulationCount: number;
   createdAt: Timestamp | null;
   lastLoginAt: Timestamp | null;
 };
@@ -38,11 +39,6 @@ const CLIENTS_PER_PAGE = 10;
 
 export default function AdminClients() {
   const [clients, setClients] = useState<ClientData[]>([]);
-
-  const [simulationCounts, setSimulationCounts] = useState<
-    Record<string, number>
-  >({});
-
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -54,10 +50,6 @@ export default function AdminClients() {
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-
-  const [simulationError, setSimulationError] =
-    useState("");
-
   const [actionError, setActionError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
 
@@ -67,27 +59,10 @@ export default function AdminClients() {
   useEffect(() => {
     let unsubscribeClients: (() => void) | undefined;
 
-    const simulationUnsubscribers = new Map<
-      string,
-      () => void
-    >();
-
-    function clearSimulationListeners() {
-      simulationUnsubscribers.forEach((unsubscribe) => {
-        unsubscribe();
-      });
-
-      simulationUnsubscribers.clear();
-    }
-
     const unsubscribeAuth = onAuthStateChanged(
       auth,
       (user) => {
         unsubscribeClients?.();
-        clearSimulationListeners();
-
-        setSimulationCounts({});
-        setSimulationError("");
 
         if (!user) {
           setClients([]);
@@ -114,6 +89,10 @@ export default function AdminClients() {
                     data.status ?? "unknown"
                   ),
                   role: String(data.role ?? "client"),
+                  simulationCount: Math.max(
+                    0,
+                    Number(data.simulationCount ?? 0)
+                  ),
                   createdAt:
                     data.createdAt instanceof Timestamp
                       ? data.createdAt
@@ -125,72 +104,6 @@ export default function AdminClients() {
                 } satisfies ClientData;
               }
             );
-
-            const currentClientIds = new Set(
-              loadedClients.map((client) => client.id)
-            );
-
-            simulationUnsubscribers.forEach(
-              (unsubscribe, clientId) => {
-                if (!currentClientIds.has(clientId)) {
-                  unsubscribe();
-
-                  simulationUnsubscribers.delete(
-                    clientId
-                  );
-
-                  setSimulationCounts((current) => {
-                    const updatedCounts = {
-                      ...current,
-                    };
-
-                    delete updatedCounts[clientId];
-
-                    return updatedCounts;
-                  });
-                }
-              }
-            );
-
-            loadedClients.forEach((client) => {
-              if (
-                simulationUnsubscribers.has(client.id)
-              ) {
-                return;
-              }
-
-              const unsubscribeSimulations =
-                onSnapshot(
-                  collection(
-                    db,
-                    "users",
-                    client.id,
-                    "simulations"
-                  ),
-                  (simulationSnapshot) => {
-                    setSimulationCounts((current) => ({
-                      ...current,
-                      [client.id]:
-                        simulationSnapshot.size,
-                    }));
-                  },
-                  (error) => {
-                    console.error(
-                      `Error cargando simulaciones de ${client.id}:`,
-                      error
-                    );
-
-                    setSimulationError(
-                      "No se pudieron cargar algunos conteos de simulaciones. Verifica las reglas de Firestore."
-                    );
-                  }
-                );
-
-              simulationUnsubscribers.set(
-                client.id,
-                unsubscribeSimulations
-              );
-            });
 
             setClients(loadedClients);
             setLoadError("");
@@ -215,7 +128,6 @@ export default function AdminClients() {
     return () => {
       unsubscribeAuth();
       unsubscribeClients?.();
-      clearSimulationListeners();
     };
   }, []);
 
@@ -276,13 +188,10 @@ export default function AdminClients() {
         }
 
         if (sortOption === "simulations-desc") {
-          const firstCount =
-            simulationCounts[first.id] ?? 0;
-
-          const secondCount =
-            simulationCounts[second.id] ?? 0;
-
-          return secondCount - firstCount;
+          return (
+            second.simulationCount -
+            first.simulationCount
+          );
         }
 
         return 0;
@@ -293,7 +202,6 @@ export default function AdminClients() {
     search,
     statusFilter,
     sortOption,
-    simulationCounts,
   ]);
 
   const totalPages = Math.max(
@@ -324,20 +232,12 @@ export default function AdminClients() {
   }, [currentPage, totalPages]);
 
   const totalSimulations = useMemo(() => {
-    return Object.values(
-      simulationCounts
-    ).reduce(
-      (total, count) => total + count,
+    return clients.reduce(
+      (total, client) =>
+        total + client.simulationCount,
       0
     );
-  }, [simulationCounts]);
-
-  const simulationCountsLoaded =
-    clients.length === 0 ||
-    clients.every(
-      (client) =>
-        simulationCounts[client.id] !== undefined
-    );
+  }, [clients]);
 
   function formatDate(value: Timestamp | null) {
     if (!value) {
@@ -527,21 +427,10 @@ export default function AdminClients() {
           </p>
 
           <p className="mt-3 text-4xl font-bold text-blue-300">
-            {simulationCountsLoaded
-              ? totalSimulations
-              : "..."}
+            {totalSimulations}
           </p>
         </div>
       </div>
-
-      {simulationError && (
-        <div
-          role="alert"
-          className="mb-5 rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300"
-        >
-          {simulationError}
-        </div>
-      )}
 
       {actionMessage && (
         <div
@@ -705,9 +594,6 @@ export default function AdminClients() {
                     const isUpdating =
                       updatingClientId === client.id;
 
-                    const clientSimulationCount =
-                      simulationCounts[client.id];
-
                     return (
                       <tr
                         key={client.id}
@@ -745,8 +631,7 @@ export default function AdminClients() {
 
                         <td className="px-5 py-4 text-center">
                           <span className="inline-flex min-w-10 justify-center rounded-lg border border-blue-400/20 bg-blue-500/10 px-3 py-2 font-bold text-blue-300">
-                            {clientSimulationCount ??
-                              "..."}
+                            {client.simulationCount}
                           </span>
                         </td>
 

@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import {
-  addDoc,
   collection,
+  doc,
+  increment,
   serverTimestamp,
+  writeBatch,
 } from "firebase/firestore";
 import { auth, db } from "../../lib/firebase";
 
@@ -46,36 +48,69 @@ export default function SaveSimulationButton({
     const user = auth.currentUser;
 
     if (!user) {
-      setError("Debes iniciar sesión para guardar la simulación.");
+      setError(
+        "Debes iniciar sesión para guardar la simulación."
+      );
       return;
     }
 
     if (capital <= 0 || percentage <= 0) {
-      setError("El capital y el porcentaje deben ser mayores que cero.");
+      setError(
+        "El capital y el porcentaje deben ser mayores que cero."
+      );
       return;
     }
 
     setLoading(true);
 
     try {
-      await addDoc(
-        collection(db, "users", user.uid, "simulations"),
-        {
-          userId: user.uid,
-          capital,
-          currency,
-          percentage,
-          lot,
-          estimatedProfit,
-          finalCapital,
-          projections,
-          createdAt: serverTimestamp(),
-        }
+      const simulationReference = doc(
+        collection(
+          db,
+          "users",
+          user.uid,
+          "simulations"
+        )
       );
 
-      setMessage("Simulación guardada correctamente.");
-    } catch {
-      setError("No se pudo guardar la simulación.");
+      const userReference = doc(
+        db,
+        "users",
+        user.uid
+      );
+
+      const batch = writeBatch(db);
+
+      batch.set(simulationReference, {
+        userId: user.uid,
+        capital,
+        currency,
+        percentage,
+        lot,
+        estimatedProfit,
+        finalCapital,
+        projections,
+        createdAt: serverTimestamp(),
+      });
+
+      batch.update(userReference, {
+        simulationCount: increment(1),
+      });
+
+      await batch.commit();
+
+      setMessage(
+        "Simulación guardada correctamente."
+      );
+    } catch (saveError) {
+      console.error(
+        "Error guardando simulación:",
+        saveError
+      );
+
+      setError(
+        "No se pudo guardar la simulación."
+      );
     } finally {
       setLoading(false);
     }
@@ -89,7 +124,9 @@ export default function SaveSimulationButton({
         disabled={loading}
         className="w-full rounded-xl border border-blue-400/30 bg-blue-500/15 px-5 py-3 font-bold text-blue-300 transition hover:bg-blue-500/25 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {loading ? "Guardando..." : "Guardar simulación"}
+        {loading
+          ? "Guardando..."
+          : "Guardar simulación"}
       </button>
 
       {message && (
