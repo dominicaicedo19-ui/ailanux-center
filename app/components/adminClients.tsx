@@ -34,6 +34,8 @@ type SortOption =
   | "name-asc"
   | "simulations-desc";
 
+const CLIENTS_PER_PAGE = 10;
+
 export default function AdminClients() {
   const [clients, setClients] = useState<ClientData[]>([]);
 
@@ -42,6 +44,8 @@ export default function AdminClients() {
   >({});
 
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+
   const [statusFilter, setStatusFilter] =
     useState<StatusFilter>("all");
 
@@ -50,6 +54,7 @@ export default function AdminClients() {
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+
   const [simulationError, setSimulationError] =
     useState("");
 
@@ -290,6 +295,33 @@ export default function AdminClients() {
     sortOption,
     simulationCounts,
   ]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(
+      filteredClients.length / CLIENTS_PER_PAGE
+    )
+  );
+
+  const paginatedClients = useMemo(() => {
+    const startIndex =
+      (currentPage - 1) * CLIENTS_PER_PAGE;
+
+    return filteredClients.slice(
+      startIndex,
+      startIndex + CLIENTS_PER_PAGE
+    );
+  }, [filteredClients, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, sortOption]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const totalSimulations = useMemo(() => {
     return Object.values(
@@ -604,8 +636,18 @@ export default function AdminClients() {
           </div>
 
           <p className="mt-3 text-sm text-slate-500">
-            Mostrando {filteredClients.length} de{" "}
-            {clients.length} cuentas
+            Mostrando{" "}
+            {filteredClients.length === 0
+              ? 0
+              : (currentPage - 1) *
+                  CLIENTS_PER_PAGE +
+                1}
+            {" – "}
+            {Math.min(
+              currentPage * CLIENTS_PER_PAGE,
+              filteredClients.length
+            )}{" "}
+            de {filteredClients.length} resultados
           </p>
         </div>
 
@@ -615,155 +657,200 @@ export default function AdminClients() {
             seleccionados.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1300px] text-left">
-              <thead className="border-b border-white/10 bg-black/20">
-                <tr className="text-xs uppercase tracking-wider text-slate-500">
-                  <th className="px-5 py-4">
-                    Cliente
-                  </th>
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1300px] text-left">
+                <thead className="border-b border-white/10 bg-black/20">
+                  <tr className="text-xs uppercase tracking-wider text-slate-500">
+                    <th className="px-5 py-4">
+                      Cliente
+                    </th>
 
-                  <th className="px-5 py-4">
-                    Correo
-                  </th>
+                    <th className="px-5 py-4">
+                      Correo
+                    </th>
 
-                  <th className="px-5 py-4">
-                    Estado
-                  </th>
+                    <th className="px-5 py-4">
+                      Estado
+                    </th>
 
-                  <th className="px-5 py-4">
-                    Rol
-                  </th>
+                    <th className="px-5 py-4">
+                      Rol
+                    </th>
 
-                  <th className="px-5 py-4 text-center">
-                    Simulaciones
-                  </th>
+                    <th className="px-5 py-4 text-center">
+                      Simulaciones
+                    </th>
 
-                  <th className="px-5 py-4">
-                    Último acceso
-                  </th>
+                    <th className="px-5 py-4">
+                      Último acceso
+                    </th>
 
-                  <th className="px-5 py-4">
-                    Registro
-                  </th>
+                    <th className="px-5 py-4">
+                      Registro
+                    </th>
 
-                  <th className="px-5 py-4">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
+                    <th className="px-5 py-4">
+                      Acciones
+                    </th>
+                  </tr>
+                </thead>
 
-              <tbody>
-                {filteredClients.map((client) => {
-                  const isCurrentAdmin =
-                    auth.currentUser?.uid ===
-                    client.id;
+                <tbody>
+                  {paginatedClients.map((client) => {
+                    const isCurrentAdmin =
+                      auth.currentUser?.uid ===
+                      client.id;
 
-                  const isUpdating =
-                    updatingClientId === client.id;
+                    const isUpdating =
+                      updatingClientId === client.id;
 
-                  const clientSimulationCount =
-                    simulationCounts[client.id];
+                    const clientSimulationCount =
+                      simulationCounts[client.id];
 
-                  return (
-                    <tr
-                      key={client.id}
-                      className="border-b border-white/[0.06] last:border-0"
-                    >
-                      <td className="px-5 py-4 font-semibold text-white">
-                        {client.name}
+                    return (
+                      <tr
+                        key={client.id}
+                        className="border-b border-white/[0.06] last:border-0"
+                      >
+                        <td className="px-5 py-4 font-semibold text-white">
+                          {client.name}
 
-                        {isCurrentAdmin && (
-                          <span className="ml-2 text-xs font-normal text-amber-300">
-                            Tu cuenta
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="px-5 py-4 text-slate-400">
-                        {client.email}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        <span
-                          className={getStatusClasses(
-                            client.status
-                          )}
-                        >
-                          {getStatusLabel(
-                            client.status
-                          )}
-                        </span>
-                      </td>
-
-                      <td className="px-5 py-4 text-sm text-blue-300">
-                        {client.role}
-                      </td>
-
-                      <td className="px-5 py-4 text-center">
-                        <span className="inline-flex min-w-10 justify-center rounded-lg border border-blue-400/20 bg-blue-500/10 px-3 py-2 font-bold text-blue-300">
-                          {clientSimulationCount ??
-                            "..."}
-                        </span>
-                      </td>
-
-                      <td className="px-5 py-4 text-sm text-slate-400">
-                        {formatLastLogin(
-                          client.lastLoginAt
-                        )}
-                      </td>
-
-                      <td className="px-5 py-4 text-sm text-slate-500">
-                        {formatDate(
-                          client.createdAt
-                        )}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Link
-                            href={`/admin/client/${client.id}`}
-                            className="rounded-lg border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500/20"
-                          >
-                            Ver historial
-                          </Link>
-
-                          {isCurrentAdmin ? (
-                            <span className="px-2 text-xs text-slate-500">
-                              Cuenta protegida
+                          {isCurrentAdmin && (
+                            <span className="ml-2 text-xs font-normal text-amber-300">
+                              Tu cuenta
                             </span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                changeClientStatus(
-                                  client
-                                )
-                              }
-                              disabled={isUpdating}
-                              className={
-                                client.status ===
-                                "blocked"
-                                  ? "rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                                  : "rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                              }
-                            >
-                              {isUpdating
-                                ? "Procesando..."
-                                : client.status ===
-                                    "blocked"
-                                  ? "Activar"
-                                  : "Bloquear"}
-                            </button>
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+
+                        <td className="px-5 py-4 text-slate-400">
+                          {client.email}
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <span
+                            className={getStatusClasses(
+                              client.status
+                            )}
+                          >
+                            {getStatusLabel(
+                              client.status
+                            )}
+                          </span>
+                        </td>
+
+                        <td className="px-5 py-4 text-sm text-blue-300">
+                          {client.role}
+                        </td>
+
+                        <td className="px-5 py-4 text-center">
+                          <span className="inline-flex min-w-10 justify-center rounded-lg border border-blue-400/20 bg-blue-500/10 px-3 py-2 font-bold text-blue-300">
+                            {clientSimulationCount ??
+                              "..."}
+                          </span>
+                        </td>
+
+                        <td className="px-5 py-4 text-sm text-slate-400">
+                          {formatLastLogin(
+                            client.lastLoginAt
+                          )}
+                        </td>
+
+                        <td className="px-5 py-4 text-sm text-slate-500">
+                          {formatDate(
+                            client.createdAt
+                          )}
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Link
+                              href={`/admin/client/${client.id}`}
+                              className="rounded-lg border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500/20"
+                            >
+                              Ver historial
+                            </Link>
+
+                            {isCurrentAdmin ? (
+                              <span className="px-2 text-xs text-slate-500">
+                                Cuenta protegida
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  changeClientStatus(
+                                    client
+                                  )
+                                }
+                                disabled={isUpdating}
+                                className={
+                                  client.status ===
+                                  "blocked"
+                                    ? "rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                                    : "rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                                }
+                              >
+                                {isUpdating
+                                  ? "Procesando..."
+                                  : client.status ===
+                                      "blocked"
+                                    ? "Activar"
+                                    : "Bloquear"}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {filteredClients.length >
+              CLIENTS_PER_PAGE && (
+              <div className="flex flex-col gap-3 border-t border-white/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-slate-500">
+                  Página {currentPage} de{" "}
+                  {totalPages}
+                </p>
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCurrentPage((page) =>
+                        Math.max(1, page - 1)
+                      )
+                    }
+                    disabled={currentPage === 1}
+                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:border-blue-400/30 hover:text-blue-300 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Anterior
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCurrentPage((page) =>
+                        Math.min(
+                          totalPages,
+                          page + 1
+                        )
+                      )
+                    }
+                    disabled={
+                      currentPage === totalPages
+                    }
+                    className="rounded-xl border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </section>
