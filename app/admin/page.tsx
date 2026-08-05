@@ -3,6 +3,7 @@ import AdminClients from "../components/adminClients";
 import AdminGuard from "../components/adminGuard";
 import Header from "../components/header";
 import LogoutButton from "../components/logoutButton";
+import AdminActivity from "../components/adminActivity";
 
 export default function AdminPage() {
   return (
@@ -41,6 +42,8 @@ export default function AdminPage() {
           </div>
 
           <AdminClients />
+          
+          <AdminActivity />
 
           <footer className="mt-10 border-t border-white/10 pt-5 text-center text-xs text-slate-600">
             AILANUX CENTER · Acceso administrativo privado
