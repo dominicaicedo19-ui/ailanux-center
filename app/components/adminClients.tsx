@@ -22,18 +22,40 @@ type ClientData = {
   lastLoginAt: Timestamp | null;
 };
 
+type StatusFilter =
+  | "all"
+  | "active"
+  | "blocked"
+  | "pending-verification";
+
+type SortOption =
+  | "last-login-desc"
+  | "created-desc"
+  | "name-asc"
+  | "simulations-desc";
+
 export default function AdminClients() {
   const [clients, setClients] = useState<ClientData[]>([]);
+
   const [simulationCounts, setSimulationCounts] = useState<
     Record<string, number>
   >({});
 
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] =
+    useState<StatusFilter>("all");
+
+  const [sortOption, setSortOption] =
+    useState<SortOption>("last-login-desc");
+
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [simulationError, setSimulationError] = useState("");
+  const [simulationError, setSimulationError] =
+    useState("");
+
   const [actionError, setActionError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
+
   const [updatingClientId, setUpdatingClientId] =
     useState("");
 
@@ -91,24 +113,13 @@ export default function AdminClients() {
                     data.createdAt instanceof Timestamp
                       ? data.createdAt
                       : null,
-
-                      lastLoginAt:
-                      data.lastLoginAt instanceof Timestamp
-                       ? data.lastLoginAt
-                       : null,
-                };
+                  lastLoginAt:
+                    data.lastLoginAt instanceof Timestamp
+                      ? data.lastLoginAt
+                      : null,
+                } satisfies ClientData;
               }
             );
-
-            loadedClients.sort((first, second) => {
-              const firstDate =
-                first.createdAt?.toMillis() ?? 0;
-
-              const secondDate =
-                second.createdAt?.toMillis() ?? 0;
-
-              return secondDate - firstDate;
-            });
 
             const currentClientIds = new Set(
               loadedClients.map((client) => client.id)
@@ -118,10 +129,15 @@ export default function AdminClients() {
               (unsubscribe, clientId) => {
                 if (!currentClientIds.has(clientId)) {
                   unsubscribe();
-                  simulationUnsubscribers.delete(clientId);
+
+                  simulationUnsubscribers.delete(
+                    clientId
+                  );
 
                   setSimulationCounts((current) => {
-                    const updatedCounts = { ...current };
+                    const updatedCounts = {
+                      ...current,
+                    };
 
                     delete updatedCounts[clientId];
 
@@ -138,30 +154,32 @@ export default function AdminClients() {
                 return;
               }
 
-              const unsubscribeSimulations = onSnapshot(
-                collection(
-                  db,
-                  "users",
-                  client.id,
-                  "simulations"
-                ),
-                (simulationSnapshot) => {
-                  setSimulationCounts((current) => ({
-                    ...current,
-                    [client.id]: simulationSnapshot.size,
-                  }));
-                },
-                (error) => {
-                  console.error(
-                    `Error cargando simulaciones de ${client.id}:`,
-                    error
-                  );
+              const unsubscribeSimulations =
+                onSnapshot(
+                  collection(
+                    db,
+                    "users",
+                    client.id,
+                    "simulations"
+                  ),
+                  (simulationSnapshot) => {
+                    setSimulationCounts((current) => ({
+                      ...current,
+                      [client.id]:
+                        simulationSnapshot.size,
+                    }));
+                  },
+                  (error) => {
+                    console.error(
+                      `Error cargando simulaciones de ${client.id}:`,
+                      error
+                    );
 
-                  setSimulationError(
-                    "No se pudieron cargar algunos conteos de simulaciones. Verifica las reglas de Firestore."
-                  );
-                }
-              );
+                    setSimulationError(
+                      "No se pudieron cargar algunos conteos de simulaciones. Verifica las reglas de Firestore."
+                    );
+                  }
+                );
 
               simulationUnsubscribers.set(
                 client.id,
@@ -197,26 +215,86 @@ export default function AdminClients() {
   }, []);
 
   const filteredClients = useMemo(() => {
-    const cleanSearch = search.trim().toLowerCase();
+    const cleanSearch = search
+      .trim()
+      .toLowerCase();
 
-    if (!cleanSearch) {
-      return clients;
-    }
+    const matchingClients = clients.filter(
+      (client) => {
+        const matchesSearch =
+          !cleanSearch ||
+          client.name
+            .toLowerCase()
+            .includes(cleanSearch) ||
+          client.email
+            .toLowerCase()
+            .includes(cleanSearch);
 
-    return clients.filter((client) => {
-      return (
-        client.name
-          .toLowerCase()
-          .includes(cleanSearch) ||
-        client.email
-          .toLowerCase()
-          .includes(cleanSearch)
-      );
-    });
-  }, [clients, search]);
+        const matchesStatus =
+          statusFilter === "all" ||
+          client.status === statusFilter;
+
+        return matchesSearch && matchesStatus;
+      }
+    );
+
+    return [...matchingClients].sort(
+      (first, second) => {
+        if (sortOption === "last-login-desc") {
+          const firstLogin =
+            first.lastLoginAt?.toMillis() ?? 0;
+
+          const secondLogin =
+            second.lastLoginAt?.toMillis() ?? 0;
+
+          return secondLogin - firstLogin;
+        }
+
+        if (sortOption === "created-desc") {
+          const firstCreated =
+            first.createdAt?.toMillis() ?? 0;
+
+          const secondCreated =
+            second.createdAt?.toMillis() ?? 0;
+
+          return secondCreated - firstCreated;
+        }
+
+        if (sortOption === "name-asc") {
+          return first.name.localeCompare(
+            second.name,
+            "es",
+            {
+              sensitivity: "base",
+            }
+          );
+        }
+
+        if (sortOption === "simulations-desc") {
+          const firstCount =
+            simulationCounts[first.id] ?? 0;
+
+          const secondCount =
+            simulationCounts[second.id] ?? 0;
+
+          return secondCount - firstCount;
+        }
+
+        return 0;
+      }
+    );
+  }, [
+    clients,
+    search,
+    statusFilter,
+    sortOption,
+    simulationCounts,
+  ]);
 
   const totalSimulations = useMemo(() => {
-    return Object.values(simulationCounts).reduce(
+    return Object.values(
+      simulationCounts
+    ).reduce(
       (total, count) => total + count,
       0
     );
@@ -234,16 +312,19 @@ export default function AdminClients() {
       return "Sin fecha";
     }
 
-  return new Intl.DateTimeFormat("es-CO", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(value.toDate());
-}
-
-function formatLastLogin(value: Timestamp | null) {
-  if (!value) {
-    return "Nunca";
+    return new Intl.DateTimeFormat("es-CO", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(value.toDate());
   }
+
+  function formatLastLogin(
+    value: Timestamp | null
+  ) {
+    if (!value) {
+      return "Nunca";
+    }
+
     return new Intl.DateTimeFormat("es-CO", {
       dateStyle: "medium",
       timeStyle: "short",
@@ -458,24 +539,84 @@ function formatLastLogin(value: Timestamp | null) {
             Clientes de AILANUX CENTER
           </h2>
 
-          <input
-            type="search"
-            value={search}
-            onChange={(event) =>
-              setSearch(event.target.value)
-            }
-            placeholder="Buscar por nombre o correo..."
-            className="mt-5 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-blue-400"
-          />
+          <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_260px]">
+            <input
+              type="search"
+              value={search}
+              onChange={(event) =>
+                setSearch(event.target.value)
+              }
+              placeholder="Buscar por nombre o correo..."
+              className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-blue-400"
+            />
+
+            <select
+              value={statusFilter}
+              onChange={(event) =>
+                setStatusFilter(
+                  event.target.value as StatusFilter
+                )
+              }
+              className="w-full rounded-xl border border-white/10 bg-[#11151b] px-4 py-3 text-white outline-none focus:border-blue-400"
+            >
+              <option value="all">
+                Todos los estados
+              </option>
+
+              <option value="active">
+                Solo activos
+              </option>
+
+              <option value="blocked">
+                Solo bloqueados
+              </option>
+
+              <option value="pending-verification">
+                Pendientes
+              </option>
+            </select>
+
+            <select
+              value={sortOption}
+              onChange={(event) =>
+                setSortOption(
+                  event.target.value as SortOption
+                )
+              }
+              className="w-full rounded-xl border border-white/10 bg-[#11151b] px-4 py-3 text-white outline-none focus:border-blue-400"
+            >
+              <option value="last-login-desc">
+                Último acceso reciente
+              </option>
+
+              <option value="created-desc">
+                Registro más reciente
+              </option>
+
+              <option value="name-asc">
+                Nombre A–Z
+              </option>
+
+              <option value="simulations-desc">
+                Más simulaciones
+              </option>
+            </select>
+          </div>
+
+          <p className="mt-3 text-sm text-slate-500">
+            Mostrando {filteredClients.length} de{" "}
+            {clients.length} cuentas
+          </p>
         </div>
 
         {filteredClients.length === 0 ? (
           <div className="p-8 text-center text-slate-400">
-            No se encontraron clientes.
+            No se encontraron clientes con los filtros
+            seleccionados.
           </div>
         ) : (
           <div className="overflow-x-auto">
-          <table className="w-full min-w-[1300px] text-left">
+            <table className="w-full min-w-[1300px] text-left">
               <thead className="border-b border-white/10 bg-black/20">
                 <tr className="text-xs uppercase tracking-wider text-slate-500">
                   <th className="px-5 py-4">
@@ -502,20 +643,21 @@ function formatLastLogin(value: Timestamp | null) {
                     Último acceso
                   </th>
 
-<                 th className="px-5 py-4">
-                  Registro
-                </th>
+                  <th className="px-5 py-4">
+                    Registro
+                  </th>
 
-                 <th className="px-5 py-4">
-                  Acciones
-                 </th>
+                  <th className="px-5 py-4">
+                    Acciones
+                  </th>
                 </tr>
               </thead>
 
               <tbody>
                 {filteredClients.map((client) => {
                   const isCurrentAdmin =
-                    auth.currentUser?.uid === client.id;
+                    auth.currentUser?.uid ===
+                    client.id;
 
                   const isUpdating =
                     updatingClientId === client.id;
@@ -566,10 +708,10 @@ function formatLastLogin(value: Timestamp | null) {
                       </td>
 
                       <td className="px-5 py-4 text-sm text-slate-400">
-                         {formatLastLogin(
+                        {formatLastLogin(
                           client.lastLoginAt
-                         )}
-                         </td>
+                        )}
+                      </td>
 
                       <td className="px-5 py-4 text-sm text-slate-500">
                         {formatDate(
@@ -577,41 +719,45 @@ function formatLastLogin(value: Timestamp | null) {
                         )}
                       </td>
 
-                     <td className="px-5 py-4">
-  <div className="flex flex-wrap items-center gap-2">
-    <Link
-      href={`/admin/client/${client.id}`}
-      className="rounded-lg border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500/20"
-    >
-      Ver historial
-    </Link>
+                      <td className="px-5 py-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link
+                            href={`/admin/client/${client.id}`}
+                            className="rounded-lg border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500/20"
+                          >
+                            Ver historial
+                          </Link>
 
-    {isCurrentAdmin ? (
-      <span className="px-2 text-xs text-slate-500">
-        Cuenta protegida
-      </span>
-    ) : (
-      <button
-        type="button"
-        onClick={() =>
-          changeClientStatus(client)
-        }
-        disabled={isUpdating}
-        className={
-          client.status === "blocked"
-            ? "rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-            : "rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-        }
-      >
-        {isUpdating
-          ? "Procesando..."
-          : client.status === "blocked"
-            ? "Activar"
-            : "Bloquear"}
-      </button>
-    )}
-  </div>
-</td>
+                          {isCurrentAdmin ? (
+                            <span className="px-2 text-xs text-slate-500">
+                              Cuenta protegida
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                changeClientStatus(
+                                  client
+                                )
+                              }
+                              disabled={isUpdating}
+                              className={
+                                client.status ===
+                                "blocked"
+                                  ? "rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                                  : "rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                              }
+                            >
+                              {isUpdating
+                                ? "Procesando..."
+                                : client.status ===
+                                    "blocked"
+                                  ? "Activar"
+                                  : "Bloquear"}
+                            </button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
