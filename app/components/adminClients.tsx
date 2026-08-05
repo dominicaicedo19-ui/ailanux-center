@@ -12,7 +12,6 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "../../lib/firebase";
 
-
 type ClientData = {
   id: string;
   name: string;
@@ -20,6 +19,7 @@ type ClientData = {
   status: string;
   role: string;
   createdAt: Timestamp | null;
+  lastLoginAt: Timestamp | null;
 };
 
 export default function AdminClients() {
@@ -91,6 +91,11 @@ export default function AdminClients() {
                     data.createdAt instanceof Timestamp
                       ? data.createdAt
                       : null,
+
+                      lastLoginAt:
+                      data.lastLoginAt instanceof Timestamp
+                       ? data.lastLoginAt
+                       : null,
                 };
               }
             );
@@ -229,6 +234,16 @@ export default function AdminClients() {
       return "Sin fecha";
     }
 
+  return new Intl.DateTimeFormat("es-CO", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(value.toDate());
+}
+
+function formatLastLogin(value: Timestamp | null) {
+  if (!value) {
+    return "Nunca";
+  }
     return new Intl.DateTimeFormat("es-CO", {
       dateStyle: "medium",
       timeStyle: "short",
@@ -460,7 +475,7 @@ export default function AdminClients() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1120px] text-left">
+          <table className="w-full min-w-[1300px] text-left">
               <thead className="border-b border-white/10 bg-black/20">
                 <tr className="text-xs uppercase tracking-wider text-slate-500">
                   <th className="px-5 py-4">
@@ -484,12 +499,16 @@ export default function AdminClients() {
                   </th>
 
                   <th className="px-5 py-4">
-                    Registro
+                    Último acceso
                   </th>
 
-                  <th className="px-5 py-4">
-                    Acciónes
-                  </th>
+<                 th className="px-5 py-4">
+                  Registro
+                </th>
+
+                 <th className="px-5 py-4">
+                  Acciones
+                 </th>
                 </tr>
               </thead>
 
@@ -545,6 +564,12 @@ export default function AdminClients() {
                             "..."}
                         </span>
                       </td>
+
+                      <td className="px-5 py-4 text-sm text-slate-400">
+                         {formatLastLogin(
+                          client.lastLoginAt
+                         )}
+                         </td>
 
                       <td className="px-5 py-4 text-sm text-slate-500">
                         {formatDate(

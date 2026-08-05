@@ -166,10 +166,14 @@ export default function LoginForm() {
         return;
       }
 
-      if (currentStatus === "pending-verification") {
+    if (currentStatus === "pending-verification") {
   await updateDoc(profileReference, {
     emailVerified: true,
     status: "active",
+    lastLoginAt: serverTimestamp(),
+  });
+} else {
+  await updateDoc(profileReference, {
     lastLoginAt: serverTimestamp(),
   });
 }
