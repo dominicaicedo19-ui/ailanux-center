@@ -14,56 +14,79 @@ export default function DashboardCards({
   formatMoney,
 }: DashboardCardsProps) {
   return (
-    <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <div className="rounded-2xl border border-amber-400/20 bg-white/[0.04] p-5 backdrop-blur-xl">
-        <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
-          Capital
-        </p>
+    <div className="mb-8 grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <DashboardCard
+        label="Capital"
+        value={formatMoney(capital)}
+        description={currency}
+        borderClass="border-amber-400/20"
+        valueClass="text-white"
+        descriptionClass="text-amber-400"
+      />
 
-        <h3 className="mt-3 text-3xl font-bold text-white">
-          {formatMoney(capital)}
-        </h3>
+      <DashboardCard
+        label="Lotaje"
+        value={lot.toFixed(2)}
+        description="Lotes estimados"
+        borderClass="border-blue-400/20"
+        valueClass="text-blue-400"
+      />
 
-        <p className="mt-2 text-sm text-amber-400">{currency}</p>
-      </div>
+      <DashboardCard
+        label="Perfil"
+        value={`${percentage}%`}
+        description="Rendimiento estimado"
+        borderClass="border-emerald-500/20"
+        valueClass="text-emerald-400"
+      />
 
-      <div className="rounded-2xl border border-blue-400/20 bg-white/[0.04] p-5 backdrop-blur-xl">
-        <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
-          Lotaje
-        </p>
-
-        <h3 className="mt-3 text-3xl font-bold text-blue-400">
-          {lot.toFixed(2)}
-        </h3>
-
-        <p className="mt-2 text-sm text-slate-400">Lotes estimados</p>
-      </div>
-
-      <div className="rounded-2xl border border-emerald-500/20 bg-white/[0.04] p-5 backdrop-blur-xl">
-        <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
-          Perfil
-        </p>
-
-        <h3 className="mt-3 text-3xl font-bold text-emerald-400">
-          {percentage}%
-        </h3>
-
-        <p className="mt-2 text-sm text-slate-400">
-          Rendimiento estimado
-        </p>
-      </div>
-
-      <div className="rounded-2xl border border-purple-400/20 bg-white/[0.04] p-5 backdrop-blur-xl">
-        <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
-          Cuenta
-        </p>
-
-        <h3 className="mt-3 text-3xl font-bold text-purple-300">
-          {currency}
-        </h3>
-
-        <p className="mt-2 text-sm text-slate-400">Tipo de cuenta</p>
-      </div>
+      <DashboardCard
+        label="Cuenta"
+        value={currency}
+        description="Tipo de cuenta"
+        borderClass="border-purple-400/20"
+        valueClass="text-purple-300"
+      />
     </div>
+  );
+}
+
+type DashboardCardProps = {
+  label: string;
+  value: string;
+  description: string;
+  borderClass: string;
+  valueClass: string;
+  descriptionClass?: string;
+};
+
+function DashboardCard({
+  label,
+  value,
+  description,
+  borderClass,
+  valueClass,
+  descriptionClass = "text-slate-400",
+}: DashboardCardProps) {
+  return (
+    <article
+      className={`min-w-0 rounded-2xl border bg-white/[0.04] p-4 backdrop-blur-xl sm:p-5 ${borderClass}`}
+    >
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 sm:text-xs sm:tracking-[0.25em]">
+        {label}
+      </p>
+
+      <p
+        className={`mt-3 break-all text-xl font-bold leading-tight tabular-nums sm:text-3xl ${valueClass}`}
+      >
+        {value}
+      </p>
+
+      <p
+        className={`mt-2 break-words text-xs leading-5 sm:text-sm ${descriptionClass}`}
+      >
+        {description}
+      </p>
+    </article>
   );
 }

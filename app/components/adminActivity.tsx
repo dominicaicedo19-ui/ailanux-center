@@ -1,7 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
@@ -32,20 +36,32 @@ type RecentSimulation = {
 };
 
 export default function AdminActivity() {
-  const [clients, setClients] = useState<ClientActivity[]>([]);
+  const [clients, setClients] = useState<
+    ClientActivity[]
+  >([]);
+
   const [simulations, setSimulations] = useState<
     RecentSimulation[]
   >([]);
 
-  const [clientsLoading, setClientsLoading] = useState(true);
-  const [simulationsLoading, setSimulationsLoading] =
+  const [clientsLoading, setClientsLoading] =
     useState(true);
+
+  const [
+    simulationsLoading,
+    setSimulationsLoading,
+  ] = useState(true);
 
   const [error, setError] = useState("");
 
   useEffect(() => {
-    let unsubscribeClients: (() => void) | undefined;
-    let unsubscribeSimulations: (() => void) | undefined;
+    let unsubscribeClients:
+      | (() => void)
+      | undefined;
+
+    let unsubscribeSimulations:
+      | (() => void)
+      | undefined;
 
     const unsubscribeAuth = onAuthStateChanged(
       auth,
@@ -68,23 +84,26 @@ export default function AdminActivity() {
         unsubscribeClients = onSnapshot(
           collection(db, "users"),
           (snapshot) => {
-            const loadedClients = snapshot.docs.map(
-              (document) => {
+            const loadedClients =
+              snapshot.docs.map((document) => {
                 const data = document.data();
 
                 return {
                   id: document.id,
                   name: String(
-                    data.name ?? "Cliente sin nombre"
+                    data.name ??
+                      "Cliente sin nombre"
                   ),
-                  email: String(data.email ?? ""),
+                  email: String(
+                    data.email ?? ""
+                  ),
                   lastLoginAt:
-                    data.lastLoginAt instanceof Timestamp
+                    data.lastLoginAt instanceof
+                    Timestamp
                       ? data.lastLoginAt
                       : null,
                 } satisfies ClientActivity;
-              }
-            );
+              });
 
             setClients(loadedClients);
             setClientsLoading(false);
@@ -112,18 +131,21 @@ export default function AdminActivity() {
         unsubscribeSimulations = onSnapshot(
           simulationsQuery,
           (snapshot) => {
-            const loadedSimulations = snapshot.docs.map(
-              (document) => {
+            const loadedSimulations =
+              snapshot.docs.map((document) => {
                 const data = document.data();
 
                 return {
                   id: document.id,
                   userId: String(
                     data.userId ??
-                      document.ref.parent.parent?.id ??
+                      document.ref.parent.parent
+                        ?.id ??
                       ""
                   ),
-                  capital: Number(data.capital ?? 0),
+                  capital: Number(
+                    data.capital ?? 0
+                  ),
                   currency:
                     data.currency === "USC"
                       ? "USC"
@@ -135,12 +157,12 @@ export default function AdminActivity() {
                     data.finalCapital ?? 0
                   ),
                   createdAt:
-                    data.createdAt instanceof Timestamp
+                    data.createdAt instanceof
+                    Timestamp
                       ? data.createdAt
                       : null,
                 } satisfies RecentSimulation;
-              }
-            );
+              });
 
             setSimulations(loadedSimulations);
             setSimulationsLoading(false);
@@ -170,7 +192,10 @@ export default function AdminActivity() {
 
   const clientsById = useMemo(() => {
     return new Map(
-      clients.map((client) => [client.id, client])
+      clients.map((client) => [
+        client.id,
+        client,
+      ])
     );
   }, [clients]);
 
@@ -193,7 +218,9 @@ export default function AdminActivity() {
       .slice(0, 6);
   }, [clients]);
 
-  function formatDate(value: Timestamp | null) {
+  function formatDate(
+    value: Timestamp | null
+  ) {
     if (!value) {
       return "Sin fecha";
     }
@@ -212,32 +239,42 @@ export default function AdminActivity() {
   }
 
   return (
-    <section className="mt-8">
+    <section>
       <div className="mb-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-blue-400">
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-400 sm:tracking-[0.25em]">
           Monitoreo
         </p>
 
-        <h2 className="mt-1 text-2xl font-bold text-white">
+        <h2 className="mt-1 text-xl font-bold text-white sm:text-2xl">
           Actividad reciente
         </h2>
+
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+          Consulta los últimos accesos y las
+          simulaciones guardadas recientemente.
+        </p>
       </div>
 
       {error && (
-        <div className="mb-5 rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+        <div
+          role="alert"
+          className="mb-5 rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-300"
+        >
           {error}
         </div>
       )}
 
       <div className="grid gap-6 xl:grid-cols-2">
+        {/* Últimos accesos */}
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04]">
-          <div className="border-b border-white/10 px-5 py-4">
+          <div className="border-b border-white/10 px-4 py-4 sm:px-5">
             <h3 className="font-bold text-white">
               Últimos accesos
             </h3>
 
             <p className="mt-1 text-sm text-slate-500">
-              Clientes que ingresaron recientemente
+              Clientes que ingresaron
+              recientemente
             </p>
           </div>
 
@@ -250,40 +287,49 @@ export default function AdminActivity() {
               Todavía no hay accesos registrados.
             </div>
           ) : (
-            <div className="divide-y divide-white/[0.06]">
+            <div className="space-y-3 p-4 sm:space-y-0 sm:p-0">
               {recentClients.map((client) => (
-                <div
+                <article
                   key={client.id}
-                  className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+                  className="rounded-2xl border border-white/10 bg-black/20 p-4 sm:rounded-none sm:border-x-0 sm:border-t-0 sm:border-b sm:border-white/[0.06] sm:bg-transparent sm:px-5 sm:py-4 sm:last:border-b-0"
                 >
-                  <div>
-                    <p className="font-semibold text-white">
-                      {client.name}
-                    </p>
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="break-words font-semibold text-white">
+                        {client.name}
+                      </p>
 
-                    <p className="text-sm text-slate-500">
-                      {client.email}
-                    </p>
+                      <p className="mt-1 break-all text-sm text-slate-500">
+                        {client.email}
+                      </p>
 
-                    <p className="mt-1 text-xs text-slate-600">
-                      {formatDate(client.lastLoginAt)}
-                    </p>
+                      <div className="mt-3 flex items-center gap-2">
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+
+                        <p className="text-xs text-slate-500">
+                          {formatDate(
+                            client.lastLoginAt
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <Link
+                      href={`/admin/client/${client.id}`}
+                      className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500/20 sm:w-auto sm:shrink-0"
+                    >
+                      Ver historial
+                    </Link>
                   </div>
-
-                  <Link
-                    href={`/admin/client/${client.id}`}
-                    className="text-sm font-semibold text-blue-300 hover:text-blue-200"
-                  >
-                    Ver historial →
-                  </Link>
-                </div>
+                </article>
               ))}
             </div>
           )}
         </div>
 
+        {/* Últimas simulaciones */}
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04]">
-          <div className="border-b border-white/10 px-5 py-4">
+          <div className="border-b border-white/10 px-4 py-4 sm:px-5">
             <h3 className="font-bold text-white">
               Últimas simulaciones
             </h3>
@@ -299,49 +345,60 @@ export default function AdminActivity() {
             </div>
           ) : simulations.length === 0 ? (
             <div className="p-8 text-center text-slate-400">
-              Todavía no hay simulaciones guardadas.
+              Todavía no hay simulaciones
+              guardadas.
             </div>
           ) : (
-            <div className="divide-y divide-white/[0.06]">
+            <div className="space-y-4 p-4 sm:space-y-0 sm:p-0">
               {simulations.map((simulation) => {
                 const client = clientsById.get(
                   simulation.userId
                 );
 
                 return (
-                  <div
+                  <article
                     key={`${simulation.userId}-${simulation.id}`}
-                    className="px-5 py-4"
+                    className="rounded-2xl border border-white/10 bg-black/20 p-4 sm:rounded-none sm:border-x-0 sm:border-t-0 sm:border-b sm:border-white/[0.06] sm:bg-transparent sm:px-5 sm:py-4 sm:last:border-b-0"
                   >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="font-semibold text-white">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="break-words font-semibold text-white">
                           {client?.name ??
                             "Cliente sin nombre"}
                         </p>
 
-                        <p className="text-sm text-slate-500">
-                          {formatMoney(
-                            simulation.capital
-                          )}{" "}
-                          {simulation.currency}
-                          {" · "}
-                          Perfil {simulation.percentage}%
-                        </p>
-
-                        <p className="mt-1 text-xs text-slate-600">
+                        <p className="mt-1 text-xs text-slate-500">
                           {formatDate(
                             simulation.createdAt
                           )}
                         </p>
                       </div>
 
-                      <div className="text-left sm:text-right">
-                        <p className="text-xs text-slate-500">
-                          Capital proyectado
+                      <span className="shrink-0 rounded-lg border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-300">
+                        {simulation.percentage}%
+                      </span>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      <div className="min-w-0 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                          Capital inicial
                         </p>
 
-                        <p className="font-bold text-amber-300">
+                        <p className="mt-2 break-words text-sm font-bold text-white">
+                          {formatMoney(
+                            simulation.capital
+                          )}{" "}
+                          {simulation.currency}
+                        </p>
+                      </div>
+
+                      <div className="min-w-0 rounded-xl border border-amber-400/20 bg-amber-500/[0.06] p-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                          Proyectado
+                        </p>
+
+                        <p className="mt-2 break-words text-sm font-bold text-amber-300">
                           {formatMoney(
                             simulation.finalCapital
                           )}{" "}
@@ -353,12 +410,12 @@ export default function AdminActivity() {
                     {simulation.userId && (
                       <Link
                         href={`/admin/client/${simulation.userId}`}
-                        className="mt-2 inline-block text-xs font-semibold text-blue-300 hover:text-blue-200"
+                        className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500/20 sm:w-auto"
                       >
-                        Abrir cliente →
+                        Abrir cliente
                       </Link>
                     )}
-                  </div>
+                  </article>
                 );
               })}
             </div>
