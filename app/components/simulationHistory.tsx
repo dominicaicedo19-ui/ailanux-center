@@ -189,12 +189,12 @@ export default function SimulationHistory({
 
   if (simulations.length === 0) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-8 text-center">
+      <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 text-center sm:p-8">
         <p className="font-semibold text-white">
           {noSimulationsTitle}
         </p>
 
-        <p className="mt-2 text-sm text-slate-400">
+        <p className="mt-2 text-sm leading-6 text-slate-400">
           {noSimulationsDescription}
         </p>
       </div>
@@ -203,18 +203,18 @@ export default function SimulationHistory({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04]">
-      <div className="flex flex-col gap-3 border-b border-white/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 border-b border-white/10 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-blue-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-400 sm:tracking-[0.25em]">
             Historial
           </p>
 
-          <h2 className="mt-1 text-2xl font-bold text-white">
+          <h2 className="mt-1 text-xl font-bold text-white sm:text-2xl">
             {historyTitle}
           </h2>
         </div>
 
-        <div className="rounded-xl border border-blue-400/20 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300">
+        <div className="w-fit rounded-xl border border-blue-400/20 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300">
           {simulations.length}{" "}
           {simulations.length === 1
             ? "simulación"
@@ -222,7 +222,70 @@ export default function SimulationHistory({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      {/* Vista para celulares */}
+      <div className="space-y-4 p-4 md:hidden">
+        {simulations.map((simulation) => (
+          <article
+            key={simulation.id}
+            className="rounded-2xl border border-white/10 bg-black/20 p-4"
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Fecha
+                </p>
+
+                <p className="mt-1 text-sm text-slate-300">
+                  {formatDate(simulation.createdAt)}
+                </p>
+              </div>
+
+              <span className="shrink-0 rounded-lg border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-300">
+                {simulation.percentage}%
+              </span>
+            </div>
+
+            <dl className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                <dt className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                  Capital
+                </dt>
+
+                <dd className="mt-2 break-words font-bold text-white">
+                  {formatMoney(simulation.capital)}{" "}
+                  {simulation.currency}
+                </dd>
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                <dt className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                  Lotaje
+                </dt>
+
+                <dd className="mt-2 font-bold text-blue-300">
+                  {simulation.lot.toFixed(2)}
+                </dd>
+              </div>
+            </dl>
+
+            <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-500/[0.06] p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                Capital proyectado a 12 meses
+              </p>
+
+              <p className="mt-2 break-words text-lg font-bold text-amber-300">
+                {formatMoney(
+                  simulation.finalCapital
+                )}{" "}
+                {simulation.currency}
+              </p>
+            </div>
+          </article>
+        ))}
+      </div>
+
+      {/* Vista para tabletas y computadores */}
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[760px] text-left">
           <thead className="border-b border-white/10 bg-black/20">
             <tr className="text-xs uppercase tracking-wider text-slate-500">
@@ -285,6 +348,10 @@ export default function SimulationHistory({
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="border-t border-white/10 px-4 py-3 text-xs leading-5 text-slate-500 sm:px-5">
+        Se muestran las 50 simulaciones más recientes.
       </div>
     </div>
   );
