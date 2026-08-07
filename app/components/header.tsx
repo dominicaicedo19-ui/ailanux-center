@@ -268,6 +268,13 @@ export default function Header() {
               Historial
             </Link>
 
+            <Link
+            href="/mt5"
+            className={getLinkClasses("/mt5")}
+            >
+             Mis cuentas MT5
+            </Link>
+
             {isAdmin ? (
               <Link
                 href="/admin"
@@ -311,6 +318,13 @@ export default function Header() {
           >
             Historial de simulaciones
           </Link>
+
+          <Link
+          href="/mt5"
+          className={getLinkClasses("/mt5")}
+          >
+         Mis cuentas MT5
+        </Link>
 
           {isAdmin && (
             <Link
